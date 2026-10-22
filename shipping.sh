@@ -3,7 +3,7 @@
 user_id=$(id -u)
 logs_folder="/var/log/roboshop"
 logs_file="${logs_folder}/${0}.log"
-domain_name="daws92s.shop"
+domain_name="daws92s.store"
 scripts_dir=$(dirname "$(realpath "$0")")
 R="\e[31m"
 G="\e[32m"
@@ -77,17 +77,21 @@ cp "$scripts_dir/shipping.service" /etc/systemd/system/shipping.service
 dnf install mysql -y &>> $logs_file
 validate $? "Installing MySQL client"
 
-mysql -h "mysql.$domain_name" -uroot -pRoboShop@1 < /app/db/master-data.sql
-validate $? "Loading shipping data"
+count=$(mysql -h "mysql.$domain_name" -u root -pRoboShop@1 -N -B -e "SELECT COUNT(*) FROM cities.cities;" 2>> $logs_file )
+if [ -z "$count" ] || [ "$count" -eq 0 ]; then
+    mysql -h "mysql.$domain_name" -uroot -pRoboShop@1 < /app/db/master-data.sql
+    validate $? "Loading shipping data"
+else
+    echo -e "$(timestamp) [INFO] Master data already loaded...${Y}SKIPPING${N}"
+fi
 
+mysql -h "mysql.$domain_name" -uroot -pRoboShop@1 < /app/db/app-user.sql
+validate $? "Creating APP user"
 
 systemctl daemon-reload &>> $logs_file
 systemctl enable shipping &>> $logs_file
-systemctl start shipping &>> $logs_file
-validate $? "Starting and enabling shipping"
-
 systemctl restart shipping
-validate $? "Restarting shipping"
+validate $? "Restarting/Starting shipping"
 
 
 echo "$(timestamp) [INFO] Script completed in $SECONDS seconds"
